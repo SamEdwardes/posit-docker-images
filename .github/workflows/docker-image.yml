@@ -29,7 +29,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v4.0.0
         with:
-          context: "{{defaultContext}}:r-session-complete"
-          file: Dockerfile.ubuntu2204
+          context: .
+          file: r-session-complete/Dockerfile.ubuntu2204
           push: true
           tags: samedwardes/r-session-complete:latest
