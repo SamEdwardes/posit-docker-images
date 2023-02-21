@@ -1,4 +1,3 @@
 # posit-docker-images
-My personal docker images for Posit products
 
-re-run workflow
+My personal docker images for Posit products.
