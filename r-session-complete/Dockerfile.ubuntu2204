@@ -1,0 +1,14 @@
+FROM rstudio/r-session-complete:jammy
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG PYTHON_VERSION="3.11.1"
+
+# Install latest python
+RUN curl -O https://cdn.rstudio.com/python/ubuntu-2204/pkgs/python-${PYTHON_VERSION}_1_amd64.deb && \
+    gdebi -n python-${PYTHON_VERSION}_1_amd64.deb && \
+    python-${PYTHON_VERSION}_1_amd64.deb
+
+# Update and Install Python packages
+RUN /opt/python/${PYTHON_VERSION}/bin/python -m pip install --upgrade pip wheel setuptools
+RUN /opt/python/${PYTHON_VERSION}/bin/python -m pip install \
+        rsconnect-python
