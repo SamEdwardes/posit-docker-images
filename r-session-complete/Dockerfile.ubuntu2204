@@ -3,12 +3,23 @@ FROM rstudio/r-session-complete:jammy
 ARG DEBIAN_FRONTEND=noninteractive
 ARG PYTHON_VERSION="3.11.1"
 
+# Install system depdencies
 RUN apt-get update \
     && apt-get install -y \
-      gdebi-core \
+        gdebi-core \
     && apt-get autoremove -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install my dev tools
+RUN apt-get update \
+    && apt-get install -y \
+        tree \
+        neovim \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
 
 # Install latest python
 RUN curl -O https://cdn.rstudio.com/python/ubuntu-2204/pkgs/python-${PYTHON_VERSION}_1_amd64.deb \
@@ -16,7 +27,9 @@ RUN curl -O https://cdn.rstudio.com/python/ubuntu-2204/pkgs/python-${PYTHON_VERS
     && rm python-${PYTHON_VERSION}_1_amd64.deb
 
 # Update and Install Python packages
-RUN /opt/python/${PYTHON_VERSION}/bin/python -m pip install --upgrade pip wheel setuptools
-RUN /opt/python/${PYTHON_VERSION}/bin/python -m pip install \
-        rsconnect-python \
-        pipx
+RUN /opt/python/${PYTHON_VERSION}/bin/python -m pip install --upgrade \
+    pip \
+    wheel \
+    setuptools \
+    rsconnect-python \
+    pipx
