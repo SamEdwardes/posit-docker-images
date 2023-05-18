@@ -1,0 +1,239 @@
+FROM ubuntu:22.04
+
+LABEL maintainer="Sam Edwardes <sam.edwardes@posit.co>"
+ARG DEBIAN_FRONTEND=noninteractive
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# ------------------------------------------------------------------------------
+# Build args
+# ------------------------------------------------------------------------------
+ARG TINI_VERSION="0.19.0"
+ARG SESSION_COMPONENTS_URL="https://s3.amazonaws.com/rstudio-ide-build/session/jammy/amd64/rsp-session-jammy-2023.03.0-386.pro1-amd64.tar.gz"
+ARG DRIVERS_VERSION="2022.11.0"
+ARG QUARTO_VERSION="1.1.251"
+
+# R_VERSIONS and PYTHON_VERSIONS should be a space sperated list. For exmaple
+# - to install 3 Python versions: ARG PYTHON_VERSIONS="3.11.3 3.10.11 3.9.14"
+# - to install 1 Python version: ARG PYTHON_VERSIONS="3.11.3"
+# The first version in the list will be set as the default.
+ARG R_VERSIONS="4.2.3 4.1.3"
+ARG PYTHON_VERSIONS="3.11.3 3.10.11"
+
+# ------------------------------------------------------------------------------
+# REQUIRED: Install the minimum required system depdencies
+# ------------------------------------------------------------------------------
+RUN apt-get update \
+    && apt-get install -y \
+        ca-certificates \
+        curl \
+        gpg \
+        gpg-agent \
+        libev-dev \
+        libuser \
+        libuser1-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# REQUIRED: Install tini
+# ------------------------------------------------------------------------------
+ADD https://cdn.rstudio.com/platform/tini/v${TINI_VERSION}/tini-amd64 /tini
+ADD https://cdn.rstudio.com/platform/tini/v${TINI_VERSION}/tini-amd64.asc /tini.asc
+RUN gpg --batch --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
+    && gpg --batch --verify /tini.asc /tini \
+    && chmod +x /tini \
+    && ln -s /tini /usr/local/bin/tini
+
+# ------------------------------------------------------------------------------
+# REQUIRED: Install Workbench Session Compontents
+# ------------------------------------------------------------------------------
+RUN curl -o rsp-session.tar.gz $SESSION_COMPONENTS_URL \
+    && mkdir -p /usr/lib/rstudio-server \
+    && tar xzvf rsp-session.tar.gz -C /usr/lib/rstudio-server --strip-components=1 \
+    && rm rsp-session.tar.gz
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install commonly required system depdencies
+# - for building R packages
+# - commonly used dev and command line tools
+# ------------------------------------------------------------------------------
+RUN apt-get update \
+    && apt-get install -y \
+        apt-transport-https \
+        build-essential \
+        cmake \
+        default-jdk \
+        dirmngr \
+        dpkg-sig \
+        g++ \
+        gcc \
+        gdal-bin \
+        gdebi-core \
+        gfortran \
+        git \
+        gsfonts \
+        imagemagick \
+        libcairo2-dev \
+        libcurl4-openssl-dev \
+        libfontconfig1-dev \
+        libfreetype6-dev \
+        libfribidi-dev \
+        libgdal-dev \
+        libgeos-dev \
+        libgl1-mesa-dev \
+        libglpk-dev \
+        libglu1-mesa-dev \
+        libgmp3-dev \
+        libharfbuzz-dev \
+        libicu-dev \
+        libjpeg-dev \
+        libmagick++-dev \
+        libmysqlclient-dev \
+        libopenblas-dev \
+        libpaper-utils \
+        libpcre2-dev \
+        libpng-dev \
+        libproj-dev \
+        libsodium-dev \
+        libssh2-1-dev \
+        libssl-dev \
+        libtiff-dev \
+        libudunits2-dev \
+        libv8-dev \
+        libxml2-dev \
+        locales \
+        make \
+        pandoc \
+        perl \
+        sudo \
+        tcl \
+        tk \
+        tk-dev \
+        tk-table \
+        tzdata \
+        unzip \
+        wget \
+        zip \
+        zlib1g-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# OPTIONAL: Install system depdendenies requested by users
+# ------------------------------------------------------------------------------
+RUN apt-get update \
+    && apt-get install -y \
+        openjdk-8-jdk \
+        texlive-latex-extra \
+        tree \
+        vim \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install Pro Database Drivers
+# ------------------------------------------------------------------------------
+RUN apt-get update \
+    && apt-get install -yq --no-install-recommends unixodbc unixodbc-dev \
+    && curl -O https://cdn.rstudio.com/drivers/7C152C12/installer/rstudio-drivers_${DRIVERS_VERSION}_amd64.deb \
+    && apt-get update \
+    && apt-get install -yq --no-install-recommends ./rstudio-drivers_${DRIVERS_VERSION}_amd64.deb \
+    && rm -f ./rstudio-drivers_${DRIVERS_VERSION}_amd64.deb \
+    && rm -rf /var/lib/apt/lists/* \
+    && cp /opt/rstudio-drivers/odbcinst.ini.sample /etc/odbcinst.ini
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install TinyTex
+# ------------------------------------------------------------------------------
+RUN curl -sL "https://yihui.org/tinytex/install-bin-unix.sh" | sh \
+    && /root/.TinyTeX/bin/*/tlmgr path remove \
+    && mv /root/.TinyTeX/ /opt/TinyTeX \
+    && /opt/TinyTeX/bin/*/tlmgr option sys_bin /usr/local/bin \
+    && /opt/TinyTeX/bin/*/tlmgr path add
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install Quarto
+# ------------------------------------------------------------------------------
+RUN curl -o quarto.tar.gz -L https://github.com/quarto-dev/quarto-cli/releases/download/v${QUARTO_VERSION}/quarto-${QUARTO_VERSION}-linux-amd64.tar.gz \
+    && mkdir -p /opt/quarto/${QUARTO_VERSION} \
+    && tar -zxvf quarto.tar.gz -C "/opt/quarto/${QUARTO_VERSION}" --strip-components=1 \
+    && rm -f quarto.tar.gz \
+    && ln -s /opt/quarto/${QUARTO_VERSION}/bin/quarto /usr/local/bin/quarto
+
+# Install depdencies required to render a quarto doc to a pdf.
+RUN tlmgr install \
+  koma-script \
+  caption \
+  tcolorbox \
+  pgf \
+  pdfcol \
+  environ \
+  oberdiek \
+  tikzfill \
+  bookmark
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install R
+# ------------------------------------------------------------------------------
+# Install R versions
+RUN for R_VER in $R_VERSIONS; \
+    do \
+        curl -O https://cdn.rstudio.com/r/ubuntu-2204/pkgs/r-${R_VER}_1_amd64.deb \
+        && gdebi -n r-${R_VER}_1_amd64.deb \
+        && rm -f ./r-${R_VER}_1_amd64.deb; \
+    done
+
+# Set the default version of R
+RUN R_DEFAULT_VERSION=$(echo $R_VERSIONS | cut -d " " -f 1) \
+    && ln -sf /opt/R/${R_DEFAULT_VERSION}/bin/R /usr/local/bin/R \
+    && ln -sf /opt/R/${R_DEFAULT_VERSION}/bin/Rscript /usr/local/bin/Rscript
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Install Python
+# ------------------------------------------------------------------------------
+# Install python versions
+RUN for PYTHON_VER in $PYTHON_VERSIONS; \
+    do \
+        curl -O https://cdn.rstudio.com/python/ubuntu-2204/pkgs/python-${PYTHON_VER}_1_amd64.deb \
+        && gdebi -n python-${PYTHON_VER}_1_amd64.deb \
+        && rm -rf python-${PYTHON_VER}_1_amd64.deb \
+        && /opt/python/${PYTHON_VER}/bin/python3 -m pip install --upgrade pip wheel setuptools \
+        && /opt/python/${PYTHON_VER}/bin/python3 -m pip install ipykernel \
+        && /opt/python/${PYTHON_VER}/bin/python3 -m ipykernel install --name py${PYTHON_VER} --display-name "Python ${PYTHON_VER}"; \
+    done
+
+# Install jupyter (for the first python version only)
+RUN PYTHON_DEFAULT_VERSION=$(echo $PYTHON_VERSIONS | cut -d " " -f 1) \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/pip install \
+      jupyter \
+      jupyterlab \
+      rsconnect_jupyter \
+      rsconnect_python \
+      rsp_jupyter \
+      workbench_jupyterlab \
+    && ln -s /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter /usr/local/bin/jupyter \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-nbextension install --sys-prefix --py rsp_jupyter \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-nbextension enable --sys-prefix --py rsp_jupyter \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-nbextension install --sys-prefix --py rsconnect_jupyter \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-nbextension enable --sys-prefix --py rsconnect_jupyter \
+    && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-serverextension enable --sys-prefix --py rsconnect_jupyter
+
+# Add python related environment variables
+ENV WORKBENCH_JUPYTER_PATH=/usr/local/bin/jupyter
+RUN PYTHON_DEFAULT_VERSION=$(echo $PYTHON_VERSIONS | cut -d " " -f 1) \
+    && echo "export PATH=/opt/python/${PYTHON_DEFAULT_VERSION}/bin:\$PATH" >> /etc/profile.d/workbench_init.sh \
+    && echo "export RETICULATE_PYTHON=/opt/python/${PYTHON_DEFAULT_VERSION}/bin/python" >> /etc/profile.d/workbench_init.sh
+
+# ------------------------------------------------------------------------------
+# RECOMMENDED: Set other environment variables
+# ------------------------------------------------------------------------------
+ENV SHELL="/bin/bash"
+
+# ------------------------------------------------------------------------------
+# REQUIRED: Entry point
+# ------------------------------------------------------------------------------
+ENTRYPOINT ["/tini", "--"]
+EXPOSE 8788/tcp
