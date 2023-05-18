@@ -1,2 +1,6 @@
 build:
-    docker build --file r-session-complete/Dockerfile.ubuntu2204 --tag r-session-complete:latest .
+    docker build \
+        --platform 'linux/amd64' \
+        --tag samedwardes/workbench-session-complete:latest \
+        -f workbench-session-complete/Dockerfile.ubuntu2204 \
+        workbench-session-complete/

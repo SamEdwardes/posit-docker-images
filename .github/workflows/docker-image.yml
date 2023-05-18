@@ -24,12 +24,12 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4.3.0
         with:
-          images: samedwardes/r-session-complete
+          images: samedwardes/workbench-session-complete
       
       - name: Build and push Docker image
         uses: docker/build-push-action@v4.0.0
         with:
-          context: .
-          file: r-session-complete/Dockerfile.ubuntu2204
+          context: workbench-session-complete
+          file: workbench-session-complete/Dockerfile.ubuntu2204
           push: true
-          tags: samedwardes/r-session-complete:latest
+          tags: samedwardes/workbench-session-complete:latest
