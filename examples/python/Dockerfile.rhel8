@@ -1,0 +1,11 @@
+FROM rockylinux:8.9
+
+ARG PYTHON_VERSION="3.11.3"
+
+# Install the EPEL repository package and enable the EPEL repository
+RUN dnf install -y https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm
+RUN dnf config-manager --enable epel
+
+# Install Python
+RUN curl -O https://cdn.rstudio.com/python/centos-8/pkgs/python-${PYTHON_VERSION}-1-1.x86_64.rpm
+RUN dnf install -y python-${PYTHON_VERSION}-1-1.x86_64.rpm
