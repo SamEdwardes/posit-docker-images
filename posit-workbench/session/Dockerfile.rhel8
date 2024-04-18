@@ -9,14 +9,13 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # R_VERSIONS and PYTHON_VERSIONS should be a space sperated list. For exmaple
 # - to install 3 Python versions: ARG PYTHON_VERSIONS="3.11.3 3.10.11 3.9.14"
 # - to install 1 Python version: ARG PYTHON_VERSIONS="3.11.3"
-# The first version in the list will be set as the default.
-ARG TINI_VERSION="0.19.0"
-ARG QUARTO_VERSION="1.1.251"
+# - The first version in the list will be set as the default.
 ARG R_VERSIONS="4.2.3"
 ARG PYTHON_VERSIONS="3.11.3"
+ARG POSIT_WORKBENCH_VERSION="2023.12.1-402.pro1"
 
 # ------------------------------------------------------------------------------
-# REQUIRED: Install the minimum required system depdencies
+# Install the minimum required system depdencies
 # ------------------------------------------------------------------------------
 # Install the EPEL repository package and enable the EPEL repository
 RUN dnf install -y \
@@ -37,33 +36,19 @@ RUN dnf update -y \
         libuser-devel
 
 # ------------------------------------------------------------------------------
-# REQUIRED: Install tini
-# ------------------------------------------------------------------------------
-# ADD https://cdn.rstudio.com/platform/tini/v${TINI_VERSION}/tini-amd64 /tini
-# ADD https://cdn.rstudio.com/platform/tini/v${TINI_VERSION}/tini-amd64.asc /tini.asc
-# RUN gpg --batch --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys 595E85A6B1B4779EA4DAAEC70B588DFF0527A9B7 \
-#     && gpg --batch --verify /tini.asc /tini \
-#     && chmod +x /tini \
-#     && ln -s /tini /usr/local/bin/tini
-
-# ------------------------------------------------------------------------------
-# REQUIRED: Install Workbench Session Compontents
+# Install Workbench Session Components
 # ------------------------------------------------------------------------------
 # See the following link for the latest version of the session components:
 # https://docs.posit.co/ide/server-pro/integration/launcher-slurm.html#install-workbench-session-components-on-slurm-compute-nodes
-RUN curl -O https://download1.rstudio.org/session/rhel8/x86_64/rsp-session-rhel8-2023.12.1-402.pro1-x86_64.tar.gz \
+RUN curl -O https://download1.rstudio.org/session/rhel8/x86_64/rsp-session-rhel8-${POSIT_WORKBENCH_VERSION}-x86_64.tar.gz \
     && mkdir -p /usr/lib/rstudio-server \
-    && tar -zxvf rsp-session-rhel8-2023.12.1-402.pro1-x86_64.tar.gz -C /usr/lib/rstudio-server/ \
+    && tar -zxvf rsp-session-rhel8-${POSIT_WORKBENCH_VERSION}-x86_64.tar.gz -C /usr/lib/rstudio-server/ \
     && mv /usr/lib/rstudio-server/rsp-session*/* /usr/lib/rstudio-server/ \
     && rm -rf /usr/lib/rstudio-server/rsp-session* \
-    && rm -f ./rsp-session-rhel8-2023.12.1-402.pro1-x86_64.tar.gz
-
-# RUN curl -O https://download2.rstudio.org/server/rhel8/x86_64/rstudio-workbench-rhel-2023.12.1-x86_64.rpm \
-#     && dnf install -y rstudio-workbench-rhel-2023.12.1-x86_64.rpm \
-#     && rm rstudio-workbench-rhel-2023.12.1-x86_64.rpm
+    && rm rsp-session-rhel8-${POSIT_WORKBENCH_VERSION}-x86_64.tar.gz
 
 # ------------------------------------------------------------------------------
-# RECOMMENDED: Install R
+# Install R
 # ------------------------------------------------------------------------------
 # Install R versions.
 RUN for R_VER in $R_VERSIONS; \
@@ -78,7 +63,7 @@ RUN R_DEFAULT_VERSION=$(echo $R_VERSIONS | cut -d " " -f 1) \
     && echo "export PATH=/opt/R/${R_DEFAULT_VERSION}/bin:\$PATH" >> /etc/profile.d/workbench_init.sh
 
 # ------------------------------------------------------------------------------
-# RECOMMENDED: Install Python
+# Install Python
 # ------------------------------------------------------------------------------
 # Install Python verisons.
 RUN for PYTHON_VER in $PYTHON_VERSIONS; \
@@ -97,7 +82,7 @@ RUN PYTHON_DEFAULT_VERSION=$(echo $PYTHON_VERSIONS | cut -d " " -f 1) \
     && echo "export RETICULATE_PYTHON=/opt/python/${PYTHON_DEFAULT_VERSION}/bin/python" >> /etc/profile.d/workbench_init.sh
 
 # ------------------------------------------------------------------------------
-# RECOMMENDED: Install Jupyter
+# Install Jupyter
 # ------------------------------------------------------------------------------
 # Jupyter only needs to be installed once. Install it for the first python version only.
 RUN PYTHON_DEFAULT_VERSION=$(echo $PYTHON_VERSIONS | cut -d " " -f 1) \
@@ -116,14 +101,3 @@ RUN PYTHON_DEFAULT_VERSION=$(echo $PYTHON_VERSIONS | cut -d " " -f 1) \
     && /opt/python/"${PYTHON_DEFAULT_VERSION}"/bin/jupyter-serverextension enable --sys-prefix --py rsconnect_jupyter
 
 ENV WORKBENCH_JUPYTER_PATH=/usr/local/bin/jupyter
-
-# ------------------------------------------------------------------------------
-# RECOMMENDED: Set other environment variables
-# ------------------------------------------------------------------------------
-# ENV SHELL="/bin/bash"
-
-# ------------------------------------------------------------------------------
-# REQUIRED: Entry point
-# ------------------------------------------------------------------------------
-# ENTRYPOINT ["/tini", "--"]
-# EXPOSE 8788/tcp
